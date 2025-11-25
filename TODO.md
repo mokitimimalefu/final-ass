@@ -1,0 +1,2 @@
+- [x] Add 'job-badge' class to job type and job location spans in DashboardOverview.js
+- [x] Add CSS rules for .job-badge in styles.css (color: black; hover: color: white;)

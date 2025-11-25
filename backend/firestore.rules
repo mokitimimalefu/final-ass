@@ -1,0 +1,49 @@
+// database/firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin';
+    }
+
+    // Students collection
+    match /students/{studentId} {
+      allow read, write: if request.auth != null && request.auth.uid == studentId;
+      allow read: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType in ['admin', 'company'];
+    }
+
+    // Institutions collection
+    match /institutions/{institutionId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin' ||
+         request.auth.uid == institutionId);
+    }
+
+    // Applications collection
+    match /applications/{applicationId} {
+      allow read, write: if request.auth != null && 
+        (resource.data.studentId == request.auth.uid ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType in ['admin', 'institute']);
+    }
+
+    // Jobs collection
+    match /jobs/{jobId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (resource.data.companyId == request.auth.uid ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin');
+    }
+
+    // Companies collection
+    match /companies/{companyId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (request.auth.uid == companyId ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin');
+    }
+  }
+}

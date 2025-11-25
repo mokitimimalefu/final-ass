@@ -1,0 +1,29 @@
+# Node
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+dist/
+build/
+
+# React frontend
+frontend/node_modules/
+frontend/build/
+
+# Backend
+backend/node_modules/
+backend/dist/
+backend/config/firebase-service-account.json
+
+# Environment files
+.env
+*.env
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# VS Code
+.vscode/
+
+
