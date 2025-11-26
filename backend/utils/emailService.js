@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport({
 
 const sendVerificationEmail = async (email, verificationToken, userType = 'user') => {
   try {
-    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${process.env.FRONTEND_URL || 'https://final-group-3.onrender.com'}/verify-email?token=${verificationToken}`;
     
     const userTypeMessages = {
       student: 'Thank you for registering as a student with the Career Guidance Platform!',

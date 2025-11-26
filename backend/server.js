@@ -154,6 +154,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Root route for Render and sanity check
+app.get("/", (req, res) => {
+  res.status(200).send("Career Guidance Backend is running 🚀");
+});
+
+
 // 404 handler (must be before error handler)
 app.use('*', (req, res) => {
   console.log(`404 - Route not found: ${req.method} ${req.path}`);
