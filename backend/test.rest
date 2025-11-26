@@ -1,0 +1,17 @@
+### Api calls
+GET https://final-group-2.onrender.com/login
+
+###post
+POST https://final-group-2.onrender.com/register
+Content-Type: application/json
+
+{
+  "email": "random@gmail.com",
+  "password": "243422222"
+}
+
+### Get all users
+GET https://final-group-2.onrender.com/jobs
+
+###
+GET http://localhost:5000/api/users
