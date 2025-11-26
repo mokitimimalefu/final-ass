@@ -8,7 +8,7 @@ const Register = () => {
   const [userType, setUserType] = useState('student');
 
   return (
-    <div className="container-fluid min-vh-100 gradient-bg-secondary py-5">
+    <div className="container-fluid min-vh-100 gradient-bg-primary py-5">
       <div className="container">
         <div className="row justify-content-center">
           <div className="col-lg-8 col-xl-6">
@@ -42,7 +42,7 @@ const Register = () => {
                   checked={userType === 'institute'}
                   onChange={() => setUserType('institute')}
                 />
-                <label className="btn btn-gradient-secondary fw-bold px-4 py-3" htmlFor="institute">
+                <label className="btn btn-gradient-primary fw-bold px-4 py-3" htmlFor="institute">
                   🏫 Institute
                 </label>
 
@@ -55,7 +55,7 @@ const Register = () => {
                   checked={userType === 'company'}
                   onChange={() => setUserType('company')}
                 />
-                <label className="btn btn-gradient-success fw-bold px-4 py-3" htmlFor="company">
+                <label className="btn btn-gradient-primary fw-bold px-4 py-3" htmlFor="company">
                   🏢 Company
                 </label>
 
@@ -68,7 +68,7 @@ const Register = () => {
                   checked={userType === 'admin'}
                   onChange={() => setUserType('admin')}
                 />
-                <label className="btn btn-gradient-danger fw-bold px-4 py-3" htmlFor="admin">
+                <label className="btn btn-gradient-primary fw-bold px-4 py-3" htmlFor="admin">
                   👤 Admin
                 </label>
               </div>

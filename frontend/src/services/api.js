@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use environment variable for backend URL, fallback to Render URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://final-group-2.onrender.com';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://final-group-9.onrender.com';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

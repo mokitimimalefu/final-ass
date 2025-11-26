@@ -1,32 +1,31 @@
 import React, { useState } from 'react';
-import { authService } from '../services/firebaseService';
 import { useAuth } from '../context/AuthContext';
-import { auth } from '../firebase';
+import { authAPI } from '../services/api'; // ✅ Import from api.js
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
-      const response = await authService.login(email, password);
-      const { user, userType } = response;
+      // ✅ Call your backend API
+      const response = await authAPI.login(email, password);
+      const { token, userType, userId } = response.data;
 
-      // Get Firebase ID token from current user
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) throw new Error('Authentication failed');
-      const idToken = await firebaseUser.getIdToken();
-
-      // Store token in localStorage for API calls
-      localStorage.setItem('token', idToken);
+      // Store token in localStorage
+      localStorage.setItem('token', token);
+      localStorage.setItem('userType', userType);
+      localStorage.setItem('userId', userId);
 
       // Update auth context
-      login(user);
+      login({ uid: userId, email, userType });
 
       // Redirect based on user type
       switch (userType) {
@@ -46,7 +45,10 @@ const Login = () => {
           window.location.href = '/';
       }
     } catch (error) {
-      alert('Login failed: ' + error.message);
+      console.error('Login error:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Login failed';
+      setError(errorMessage);
+      alert('Login failed: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -63,6 +65,12 @@ const Login = () => {
 
           <div className="glass-card card-beautiful">
             <div className="card-body p-5">
+              {error && (
+                <div className="alert alert-danger" role="alert">
+                  {error}
+                </div>
+              )}
+              
               <form onSubmit={handleSubmit}>
                 <div className="mb-4">
                   <label htmlFor="email" className="form-label fw-medium text-white">
@@ -117,7 +125,7 @@ const Login = () => {
               <hr className="my-4 opacity-50" />
 
               <div className="text-center">
-                  <p className="text-white-50 mb-0">
+                <p className="text-white-50 mb-0">
                   Don't have an account?{' '}
                   <a href="/register" className="text-white text-decoration-none fw-medium">
                     Sign up

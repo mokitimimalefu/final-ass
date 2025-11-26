@@ -116,16 +116,12 @@ app.use(cors({
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
-    process.env.FRONTEND_URL || 'https://final-group-11.onrender.com'
+    'https://final-group-11.onrender.com'  // Your frontend URL
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
-const allowedOrigins = [
-  'http://localhost:3000', 
-  'https://final-group-11.onrender.com'
-];
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));

@@ -120,10 +120,10 @@ const ApplicationsManagement = ({ applications, getStatusBadge, loading }) => {
                           <div className="modal-body">
                             <div className="row">
                               <div className="col-md-6">
-                                <h6>Course Information</h6>
-                                <p><strong>Course:</strong> {application.courseName}</p>
-                                <p><strong>Institution:</strong> {application.instituteName}</p>
-                                <p><strong>Faculty:</strong> {application.facultyName}</p>
+                                <h6 className="text-dark">Course Information</h6>
+                                <p><strong className="text-white">Course:</strong> {application.courseName}</p>
+                                <p><strong className="text-white">Institution:</strong> {application.instituteName}</p>
+                                <p><strong className="text-white">Faculty:</strong> {application.facultyName}</p>
                               </div>
                               <div className="col-md-6">
                                 <h6>Application Details</h6>
