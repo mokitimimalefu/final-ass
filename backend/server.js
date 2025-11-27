@@ -112,11 +112,13 @@ try {
 // CORS Configuration
 app.use(cors({
   origin: [
-    'http://localhost:3000', 
+    'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
-    'https://final-group-11.onrender.com'  // Your frontend URL
+    'https://final-group-5.onrender.com',  // Current frontend URL
+    'https://final-group-9.onrender.com',  // Alternative frontend URL
+    'https://final-group-11.onrender.com'  // Alternative frontend URL
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -133,18 +135,38 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes (require after initialization)
-const authRoutes = require('./routes/auth')(db, auth);
-const adminRoutes = require('./routes/admin')(db, auth);
-const instituteRoutes = require('./routes/institute')(db, auth);
-const studentRoutes = require('./routes/student')(db, auth);
-const companyRoutes = require('./routes/company')(db, auth);
+// Routes (require after initialization) - only if Firebase is properly initialized
+if (db && auth) {
+  const authRoutes = require('./routes/auth')(db, auth);
+  const adminRoutes = require('./routes/admin')(db, auth);
+  const instituteRoutes = require('./routes/institute')(db, auth);
+  const studentRoutes = require('./routes/student')(db, auth);
+  const companyRoutes = require('./routes/company')(db, auth);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/institute', instituteRoutes);
-app.use('/api/student', studentRoutes);
-app.use('/api/company', companyRoutes);
+  app.use('/api/auth', authRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/institute', instituteRoutes);
+  app.use('/api/student', studentRoutes);
+  app.use('/api/company', companyRoutes);
+} else {
+  console.error('❌ Firebase not initialized - auth routes will not be available');
+  // Add fallback route for auth endpoints
+  app.use('/api/auth', (req, res) => {
+    res.status(503).json({ error: 'Authentication service unavailable - Firebase not initialized' });
+  });
+  app.use('/api/admin', (req, res) => {
+    res.status(503).json({ error: 'Admin service unavailable - Firebase not initialized' });
+  });
+  app.use('/api/institute', (req, res) => {
+    res.status(503).json({ error: 'Institute service unavailable - Firebase not initialized' });
+  });
+  app.use('/api/student', (req, res) => {
+    res.status(503).json({ error: 'Student service unavailable - Firebase not initialized' });
+  });
+  app.use('/api/company', (req, res) => {
+    res.status(503).json({ error: 'Company service unavailable - Firebase not initialized' });
+  });
+}
 
 // Health check route
 app.get('/api/health', (req, res) => {

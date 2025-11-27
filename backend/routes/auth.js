@@ -143,27 +143,7 @@ module.exports = (db, auth) => {
 
       const userData = userDoc.data();
 
-      // Check if email is verified
-      if (!userData.emailVerified) {
-        return res.status(403).json({ 
-          success: false,
-          error: 'Please verify your email before logging in. Check your inbox for the verification link.' 
-        });
-      }
-
-      // For companies, check if account is approved
-      if (userData.userType === 'company') {
-        const companyDoc = await db.collection('companies').doc(userRecord.uid).get();
-        if (companyDoc.exists) {
-          const companyData = companyDoc.data();
-          if (companyData.status !== 'approved') {
-            return res.status(403).json({ 
-              success: false,
-              error: 'Your company account is pending approval. Please wait for admin approval.' 
-            });
-          }
-        }
-      }
+      // Email verification and company approval checks removed for development
 
       // Generate JWT token
       const token = jwt.sign(
