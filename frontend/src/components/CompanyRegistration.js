@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Form, Row, Col, Button, Spinner } from 'react-bootstrap';
-import { authAPI } from '../services/api';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const CompanyRegistration = () => {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -16,6 +21,7 @@ const CompanyRegistration = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -74,10 +80,10 @@ const CompanyRegistration = () => {
 
       alert('Registration successful! Please check your email to verify your account. After verification, your account will be reviewed by an admin for approval.');
 
-      window.location.href = '/login';
+      navigate('/login');
     } catch (error) {
       console.error('Registration error:', error);
-      alert(error.message || 'Registration failed');
+      setError(error.message || 'Registration failed');
     } finally {
       setLoading(false);
     }

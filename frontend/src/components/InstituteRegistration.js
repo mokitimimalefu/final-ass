@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Form, Row, Col, Button, Spinner } from 'react-bootstrap';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 const InstituteRegistration = () => {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -17,7 +20,7 @@ const InstituteRegistration = () => {
   });
 
   const [loading, setLoading] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -200,6 +203,14 @@ const InstituteRegistration = () => {
               />
             </Form.Group>
           </Col>
+
+          {error && (
+            <Col md={12}>
+              <div className="alert alert-danger mt-3">
+                {error}
+              </div>
+            </Col>
+          )}
 
           <Col md={12}>
             <Button
