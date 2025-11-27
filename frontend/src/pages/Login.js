@@ -3,11 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
 
 const Login = () => {
   const [email, setEmail] = useState('');
