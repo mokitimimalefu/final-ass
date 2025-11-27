@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const ApplicationModal = ({
   showApplicationModal,
@@ -9,21 +9,60 @@ const ApplicationModal = ({
   submitApplication,
   loading
 }) => {
+  const [localForm, setLocalForm] = useState({
+    personalStatement: '',
+    documents: []
+  });
+
+  // Sync with parent component's form state when modal opens
+  useEffect(() => {
+    if (showApplicationModal) {
+      setLocalForm(applicationForm);
+    }
+  }, [showApplicationModal, applicationForm]);
+
+  // Update parent component's form state when local form changes
+  useEffect(() => {
+    setApplicationForm(localForm);
+  }, [localForm, setApplicationForm]);
+
+  const handlePersonalStatementChange = (e) => {
+    setLocalForm(prev => ({
+      ...prev,
+      personalStatement: e.target.value
+    }));
+  };
+
+  const handleDocumentsChange = (e) => {
+    const files = Array.from(e.target.files);
+    setLocalForm(prev => ({
+      ...prev,
+      documents: files
+    }));
+  };
+
+  const handleClose = () => {
+    setShowApplicationModal(false);
+    setLocalForm({ personalStatement: '', documents: [] });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    submitApplication();
+  };
+
   if (!showApplicationModal || !selectedCourse) return null;
 
   return (
-    <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className="modal-dialog modal-lg">
+    <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={handleClose}>
+      <div className="modal-dialog modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title">Apply for Course</h5>
             <button
               type="button"
               className="btn-close"
-              onClick={() => {
-                setShowApplicationModal(false);
-                setApplicationForm({ personalStatement: '', documents: [] });
-              }}
+              onClick={handleClose}
               disabled={loading}
             ></button>
           </div>
@@ -58,20 +97,14 @@ const ApplicationModal = ({
             </div>
 
             {/* Application Form */}
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              submitApplication();
-            }}>
+            <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label className="form-label">Personal Statement *</label>
                 <textarea
                   className="form-control"
                   rows="6"
-                  value={applicationForm.personalStatement}
-                  onChange={(e) => setApplicationForm(prev => ({
-                    ...prev,
-                    personalStatement: e.target.value
-                  }))}
+                  value={localForm.personalStatement}
+                  onChange={handlePersonalStatementChange}
                   placeholder="Tell us why you are interested in this course and why you would be a good candidate..."
                   required
                   disabled={loading}
@@ -88,18 +121,27 @@ const ApplicationModal = ({
                   className="form-control"
                   multiple
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files);
-                    setApplicationForm(prev => ({
-                      ...prev,
-                      documents: files
-                    }));
-                  }}
+                  onChange={handleDocumentsChange}
                   disabled={loading}
                 />
                 <div className="form-text">
                   Upload any supporting documents (transcripts, certificates, etc.). Max file size: 10MB each.
                 </div>
+                
+                {/* Show selected files */}
+                {localForm.documents.length > 0 && (
+                  <div className="mt-2">
+                    <small className="text-muted">Selected files:</small>
+                    <ul className="list-unstyled mt-1">
+                      {localForm.documents.map((file, index) => (
+                        <li key={index} className="small">
+                          <i className="bi bi-file-text me-1"></i>
+                          {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="alert alert-info">
@@ -113,10 +155,7 @@ const ApplicationModal = ({
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => {
-                setShowApplicationModal(false);
-                setApplicationForm({ personalStatement: '', documents: [] });
-              }}
+              onClick={handleClose}
               disabled={loading}
             >
               Cancel
@@ -124,8 +163,8 @@ const ApplicationModal = ({
             <button
               type="button"
               className="btn btn-primary"
-              onClick={submitApplication}
-              disabled={loading || !applicationForm.personalStatement.trim()}
+              onClick={handleSubmit}
+              disabled={loading || !localForm.personalStatement.trim()}
             >
               {loading ? (
                 <>
