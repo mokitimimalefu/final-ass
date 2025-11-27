@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import InstitutionManagement from '../../components/admin/InstitutionManagement';
@@ -9,13 +9,49 @@ import AdmissionsManagement from '../../components/admin/AdmissionsManagement';
 import SystemReports from '../../components/admin/SystemReports';
 
 const AdminDashboard = () => {
-  const { logout } = useAuth();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Redirect if not authenticated or wrong user type
+  useEffect(() => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    
+    // Redirect if user is not an admin
+    if (currentUser.userType !== 'admin') {
+      const dashboardPaths = {
+        'student': '/student',
+        'institute': '/institute',
+        'company': '/company'
+      };
+      const correctPath = dashboardPaths[currentUser.userType] || '/login';
+      navigate(correctPath);
+      return;
+    }
+  }, [currentUser, navigate]);
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force redirect even if logout fails
+      navigate('/login');
+    }
+  };
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setSidebarOpen(false);
+  };
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
   };
 
   const tabs = [
@@ -28,14 +64,17 @@ const AdminDashboard = () => {
     { id: 'reports', label: 'Reports', icon: '📈' }
   ];
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Don't render anything if redirecting
+  if (!currentUser || currentUser.userType !== 'admin') {
+    return null;
+  }
 
   return (
     <div className="dashboard-container">
       {/* Mobile Toggle */}
       <button 
         className="dashboard-mobile-toggle"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
+        onClick={toggleSidebar}
       >
         <i className="bi bi-list"></i>
       </button>
@@ -53,10 +92,7 @@ const AdminDashboard = () => {
             <li key={tab.id} className="dashboard-sidebar-nav-item">
               <button
                 className={`dashboard-sidebar-nav-link ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setSidebarOpen(false);
-                }}
+                onClick={() => handleTabChange(tab.id)}
               >
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
