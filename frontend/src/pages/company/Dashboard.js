@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import JobPosting from '../../components/company/JobPosting';
@@ -15,18 +15,31 @@ const CompanyDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Redirect if not authenticated or wrong user type
   useEffect(() => {
-    if (currentUser?.uid) {
-      loadCompanyData();
-    } else {
-      setLoading(false);
+    if (!currentUser) {
+      navigate('/login');
+      return;
     }
-  }, [currentUser]);
+    
+    // Redirect if user is not a company
+    if (currentUser.userType !== 'company') {
+      const dashboardPaths = {
+        'admin': '/admin',
+        'student': '/student',
+        'institute': '/institute'
+      };
+      const correctPath = dashboardPaths[currentUser.userType] || '/login';
+      navigate(correctPath);
+      return;
+    }
+  }, [currentUser, navigate]);
 
-  const loadCompanyData = async () => {
+  const loadCompanyData = useCallback(async () => {
     try {
       setLoading(true);
       if (!currentUser?.uid) return;
+      
       const companyRef = doc(db, 'companies', currentUser.uid);
       const snap = await getDoc(companyRef);
       if (snap.exists()) {
@@ -36,19 +49,41 @@ const CompanyDashboard = () => {
       }
     } catch (error) {
       console.error('Error loading company data:', error);
-      // Don't fail if profile doesn't exist yet
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (currentUser?.uid && currentUser.userType === 'company') {
+      loadCompanyData();
+    } else {
+      setLoading(false);
+    }
+  }, [currentUser, loadCompanyData]);
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force redirect even if logout fails
+      navigate('/login');
+    }
   };
 
   const handleJobCreated = () => {
     setActiveTab('my-jobs');
+  };
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setSidebarOpen(false);
+  };
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
   };
 
   const tabs = [
@@ -57,7 +92,8 @@ const CompanyDashboard = () => {
     { id: 'profile', label: 'Profile', icon: '⚙️' }
   ];
 
-  if (loading) {
+  // Show loading only if we have a current user but data is still loading
+  if (loading && currentUser) {
     return (
       <div className="container-fluid py-4">
         <div className="text-center">
@@ -69,12 +105,17 @@ const CompanyDashboard = () => {
     );
   }
 
+  // Don't render anything if redirecting
+  if (!currentUser || currentUser.userType !== 'company') {
+    return null;
+  }
+
   return (
     <div className="dashboard-container">
       {/* Mobile Toggle */}
       <button 
         className="dashboard-mobile-toggle"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
+        onClick={toggleSidebar}
       >
         <i className="bi bi-list"></i>
       </button>
@@ -92,10 +133,7 @@ const CompanyDashboard = () => {
             <li key={tab.id} className="dashboard-sidebar-nav-item">
               <button
                 className={`dashboard-sidebar-nav-link ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setSidebarOpen(false);
-                }}
+                onClick={() => handleTabChange(tab.id)}
               >
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
