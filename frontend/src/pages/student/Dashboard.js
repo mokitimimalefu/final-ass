@@ -28,30 +28,42 @@ import NotificationBell from '../../components/student/NotificationBell';
 const StudentDashboard = () => {
   const { logout, currentUser } = useAuth();
   const navigate = useNavigate();
-  const [applications, setApplications] = useState([]);
-  const [institutions, setInstitutions] = useState([]);
-  const [jobs, setJobs] = useState([]);
-  const [allCourses, setAllCourses] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [loading, setLoading] = useState(false);
-  const [loadingApplications, setLoadingApplications] = useState(true);
-  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
-  const [loadingJobs, setLoadingJobs] = useState(true);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [loadingTranscripts, setLoadingTranscripts] = useState(true);
-  const [loadingCertificates, setLoadingCertificates] = useState(true);
-  const [loadingAllCourses, setLoadingAllCourses] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  const [showApplicationModal, setShowApplicationModal] = useState(false);
-  const [applicationForm, setApplicationForm] = useState({
-    personalStatement: '',
-    documents: []
+  
+  // State management
+  const [data, setData] = useState({
+    applications: [],
+    institutions: [],
+    jobs: [],
+    allCourses: [],
+    notifications: [],
+    profile: {},
+    transcripts: [],
+    certificates: []
   });
-  const [profile, setProfile] = useState({});
-  const [transcripts, setTranscripts] = useState([]);
-  const [certificates, setCertificates] = useState([]);
+  
+  const [ui, setUi] = useState({
+    activeTab: 'dashboard',
+    loading: false,
+    loadingApplications: true,
+    loadingInstitutions: false,
+    loadingJobs: true,
+    loadingProfile: true,
+    loadingTranscripts: true,
+    loadingCertificates: true,
+    loadingAllCourses: false,
+    sidebarOpen: false
+  });
+  
+  const [application, setApplication] = useState({
+    selectedCourse: null,
+    showApplicationModal: false,
+    form: {
+      personalStatement: '',
+      documents: []
+    }
+  });
 
+  // Tab configuration
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'applications', label: 'My Applications', icon: '📝' },
@@ -62,23 +74,32 @@ const StudentDashboard = () => {
     { id: 'documents', label: 'My Documents', icon: '📁' }
   ];
 
-  // Fetch applications from Firebase
+  // Helper functions
+  const updateData = (key, value) => {
+    setData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateUi = (key, value) => {
+    setUi(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateApplicationState = (key, value) => {
+    setApplication(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Data fetching functions
   const fetchApplications = useCallback(async () => {
     try {
       if (!currentUser) return;
-      setLoadingApplications(true);
+      updateUi('loadingApplications', true);
 
-      // Avoid composite index: filter by studentId only, sort client-side
       const q = query(
         collection(db, 'applications'),
         where('studentId', '==', currentUser.uid)
       );
 
       const querySnapshot = await getDocs(q);
-      let apps = [];
-      querySnapshot.forEach((doc) => {
-        apps.push({ id: doc.id, ...doc.data() });
-      });
+      let apps = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Sort by appliedDate desc on client
       apps.sort((a, b) => {
@@ -86,18 +107,18 @@ const StudentDashboard = () => {
         const bv = b.appliedDate?.toMillis?.() ?? b.appliedDate?.seconds ?? 0;
         return bv - av;
       });
-      setApplications(apps);
+      
+      updateData('applications', apps);
     } catch (error) {
       console.error('Error fetching applications:', error);
     } finally {
-      setLoadingApplications(false);
+      updateUi('loadingApplications', false);
     }
   }, [currentUser]);
 
-  // Fetch institutions with faculties and courses from Firebase
   const fetchInstitutions = useCallback(async () => {
     try {
-      setLoadingInstitutions(true);
+      updateUi('loadingInstitutions', true);
       const institutionsQuery = query(
         collection(db, 'institutions'),
         where('isActive', '==', true)
@@ -108,19 +129,16 @@ const StudentDashboard = () => {
         const instData = { id: instDoc.id, ...instDoc.data() };
 
         // Fetch faculties for this institution
-        // Try top-level 'faculties' with institutionId first
         let facultiesData = [];
-        {
-          const facultiesQuery = query(
-            collection(db, 'faculties'),
-            where('institutionId', '==', instDoc.id)
-          );
-          const facultiesSnapshot = await getDocs(facultiesQuery);
-          facultiesData = facultiesSnapshot.docs.map((facultyDoc) => ({
-            id: facultyDoc.id,
-            ...facultyDoc.data()
-          }));
-        }
+        const facultiesQuery = query(
+          collection(db, 'faculties'),
+          where('institutionId', '==', instDoc.id)
+        );
+        const facultiesSnapshot = await getDocs(facultiesQuery);
+        facultiesData = facultiesSnapshot.docs.map((facultyDoc) => ({
+          id: facultyDoc.id,
+          ...facultyDoc.data()
+        }));
 
         // Fallback to nested subcollection if no top-level faculties found
         if (facultiesData.length === 0) {
@@ -131,11 +149,10 @@ const StudentDashboard = () => {
           }));
         }
 
-        // For each faculty, load courses (top-level by facultyId; fallback to nested)
-        const facultiesWithCourses = [];
-        for (const faculty of facultiesData) {
-          let coursesData = [];
-          {
+        // For each faculty, load courses
+        const facultiesWithCourses = await Promise.all(
+          facultiesData.map(async (faculty) => {
+            let coursesData = [];
             const coursesQuery = query(
               collection(db, 'courses'),
               where('facultyId', '==', faculty.id)
@@ -145,43 +162,43 @@ const StudentDashboard = () => {
               id: courseDoc.id,
               ...courseDoc.data()
             }));
-          }
-          if (coursesData.length === 0) {
-            const nestedCoursesSnap = await getDocs(
-              collection(db, 'institutions', instDoc.id, 'faculties', faculty.id, 'courses')
-            );
-            coursesData = nestedCoursesSnap.docs.map((courseDoc) => ({
-              id: courseDoc.id,
-              ...courseDoc.data(),
-              institutionId: instDoc.id,
-              facultyId: faculty.id
-            }));
-          }
-          coursesData = coursesData.filter((c) => c.isActive !== false);
-          facultiesWithCourses.push({ ...faculty, courses: coursesData });
-        }
+
+            if (coursesData.length === 0) {
+              const nestedCoursesSnap = await getDocs(
+                collection(db, 'institutions', instDoc.id, 'faculties', faculty.id, 'courses')
+              );
+              coursesData = nestedCoursesSnap.docs.map((courseDoc) => ({
+                id: courseDoc.id,
+                ...courseDoc.data(),
+                institutionId: instDoc.id,
+                facultyId: faculty.id
+              }));
+            }
+            
+            coursesData = coursesData.filter((c) => c.isActive !== false);
+            return { ...faculty, courses: coursesData };
+          })
+        );
 
         const activeFaculties = facultiesWithCourses.filter((f) => f.isActive !== false);
         return { ...instData, faculties: activeFaculties };
       });
 
       const institutionsData = await Promise.all(institutionsPromises);
-      setInstitutions(institutionsData);
+      updateData('institutions', institutionsData);
     } catch (error) {
       console.error('Error fetching institutions:', error);
     } finally {
-      setLoadingInstitutions(false);
+      updateUi('loadingInstitutions', false);
     }
   }, []);
 
-  // Fetch all courses (from top-level, fallback to nested)
   const fetchAllCourses = useCallback(async () => {
     try {
-      setLoadingAllCourses(true);
-      // Try top-level 'courses'
+      updateUi('loadingAllCourses', true);
       const topSnap = await getDocs(collection(db, 'courses'));
       let courses = topSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Fallback to nested if top-level empty
+      
       if (courses.length === 0) {
         const instSnap = await getDocs(collection(db, 'institutions'));
         const nestedCourses = [];
@@ -201,37 +218,32 @@ const StudentDashboard = () => {
         }
         courses = nestedCourses;
       }
-      // Default active unless explicitly false
+      
       courses = courses.filter(c => c.isActive !== false);
-      // Sort by created/posted if present
       courses.sort((a, b) => {
         const av = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds ?? a.postedDate?.seconds ?? 0;
         const bv = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds ?? b.postedDate?.seconds ?? 0;
         return bv - av;
       });
-      setAllCourses(courses);
+      
+      updateData('allCourses', courses);
     } catch (error) {
       console.error('Error fetching all courses:', error);
     } finally {
-      setLoadingAllCourses(false);
+      updateUi('loadingAllCourses', false);
     }
   }, []);
 
-  // Fetch jobs from Firebase
   const fetchJobs = useCallback(async () => {
     try {
-      setLoadingJobs(true);
-      // Avoid composite index: fetch isActive jobs, filter status client-side, sort client-side
+      updateUi('loadingJobs', true);
       const q = query(
         collection(db, 'jobs'),
         where('isActive', '==', true)
       );
 
       const querySnapshot = await getDocs(q);
-      let jobList = [];
-      querySnapshot.forEach((doc) => {
-        jobList.push({ id: doc.id, ...doc.data() });
-      });
+      let jobList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       jobList = jobList.filter(j => (j.status || 'open') === 'open');
       jobList.sort((a, b) => {
@@ -239,46 +251,43 @@ const StudentDashboard = () => {
         const bv = b.postedDate?.toMillis?.() ?? b.postedDate?.seconds ?? 0;
         return bv - av;
       });
-      setJobs(jobList);
+      
+      updateData('jobs', jobList);
     } catch (error) {
       console.error('Error fetching jobs:', error);
     } finally {
-      setLoadingJobs(false);
+      updateUi('loadingJobs', false);
     }
   }, []);
 
-  // Fetch notifications from Firebase
   const fetchNotifications = useCallback(async () => {
     try {
       if (!currentUser) return;
       
-      // Avoid composite index: no orderBy, sort client-side
       const q = query(
         collection(db, 'notifications'),
         where('recipientId', '==', currentUser.uid)
       );
       
       const querySnapshot = await getDocs(q);
-      let notifs = [];
-      querySnapshot.forEach((doc) => {
-        notifs.push({ id: doc.id, ...doc.data() });
-      });
+      let notifs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       notifs.sort((a, b) => {
         const av = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds ?? 0;
         const bv = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds ?? 0;
         return bv - av;
       });
-      setNotifications(notifs);
+      
+      updateData('notifications', notifs);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
   }, [currentUser]);
 
-  // Fetch profile from Firebase
   const fetchProfile = useCallback(async () => {
     try {
       if (!currentUser) return;
+      updateUi('loadingProfile', true);
       
       const q = query(
         collection(db, 'students'),
@@ -288,9 +297,8 @@ const StudentDashboard = () => {
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
         const profileDoc = querySnapshot.docs[0];
-        setProfile({ id: profileDoc.id, ...profileDoc.data() });
+        updateData('profile', { id: profileDoc.id, ...profileDoc.data() });
       } else {
-        // Create a basic profile if none exists
         const basicProfile = {
           uid: currentUser.uid,
           email: currentUser.email,
@@ -307,70 +315,45 @@ const StudentDashboard = () => {
           updatedAt: serverTimestamp()
         };
         const docRef = await addDoc(collection(db, 'students'), basicProfile);
-        setProfile({ id: docRef.id, ...basicProfile });
+        updateData('profile', { id: docRef.id, ...basicProfile });
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+    } finally {
+      updateUi('loadingProfile', false);
     }
   }, [currentUser]);
 
-  // Fetch transcripts from Firebase
-  const fetchTranscripts = useCallback(async () => {
+  const fetchDocuments = useCallback(async (type) => {
     try {
       if (!currentUser) return;
       
-      // Avoid composite index: filter by student only, then filter type and sort client-side
+      if (type === 'transcript') updateUi('loadingTranscripts', true);
+      if (type === 'certificate') updateUi('loadingCertificates', true);
+      
       const q = query(
         collection(db, 'documents'),
         where('studentId', '==', currentUser.uid)
       );
       
       const querySnapshot = await getDocs(q);
-      let transcriptList = [];
-      querySnapshot.forEach((doc) => {
-        transcriptList.push({ id: doc.id, ...doc.data() });
-      });
+      let documentList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      transcriptList = transcriptList
-        .filter(d => d.type === 'transcript')
+      documentList = documentList
+        .filter(d => d.type === type)
         .sort((a, b) => {
           const av = a.uploadDate?.toMillis?.() ?? a.uploadDate?.seconds ?? 0;
           const bv = b.uploadDate?.toMillis?.() ?? b.uploadDate?.seconds ?? 0;
           return bv - av;
         });
-      setTranscripts(transcriptList);
+      
+      if (type === 'transcript') updateData('transcripts', documentList);
+      if (type === 'certificate') updateData('certificates', documentList);
     } catch (error) {
-      console.error('Error fetching transcripts:', error);
-    }
-  }, [currentUser]);
-
-  // Fetch certificates from Firebase
-  const fetchCertificates = useCallback(async () => {
-    try {
-      if (!currentUser) return;
-      
-      // Avoid composite index: filter by student only, then filter type and sort client-side
-      const q = query(
-        collection(db, 'documents'),
-        where('studentId', '==', currentUser.uid)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      let certificateList = [];
-      querySnapshot.forEach((doc) => {
-        certificateList.push({ id: doc.id, ...doc.data() });
-      });
-      
-      certificateList = certificateList
-        .filter(d => d.type === 'certificate')
-        .sort((a, b) => {
-          const av = a.uploadDate?.toMillis?.() ?? a.uploadDate?.seconds ?? 0;
-          const bv = b.uploadDate?.toMillis?.() ?? b.uploadDate?.seconds ?? 0;
-          return bv - av;
-        });
-      setCertificates(certificateList);
-    } catch (error) {
-      console.error('Error fetching certificates:', error);
+      console.error(`Error fetching ${type}s:`, error);
+    } finally {
+      if (type === 'transcript') updateUi('loadingTranscripts', false);
+      if (type === 'certificate') updateUi('loadingCertificates', false);
     }
   }, [currentUser]);
 
@@ -385,16 +368,13 @@ const StudentDashboard = () => {
     );
     
     const unsubscribeNotifications = onSnapshot(notificationsQuery, (querySnapshot) => {
-      let notifs = [];
-      querySnapshot.forEach((doc) => {
-        notifs.push({ id: doc.id, ...doc.data() });
-      });
+      let notifs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       notifs.sort((a, b) => {
         const av = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds ?? 0;
         const bv = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds ?? 0;
         return bv - av;
       });
-      setNotifications(notifs);
+      updateData('notifications', notifs);
     });
 
     // Applications listener
@@ -404,16 +384,13 @@ const StudentDashboard = () => {
     );
     
     const unsubscribeApplications = onSnapshot(applicationsQuery, (querySnapshot) => {
-      let apps = [];
-      querySnapshot.forEach((doc) => {
-        apps.push({ id: doc.id, ...doc.data() });
-      });
+      let apps = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       apps.sort((a, b) => {
         const av = a.appliedDate?.toMillis?.() ?? a.appliedDate?.seconds ?? 0;
         const bv = b.appliedDate?.toMillis?.() ?? b.appliedDate?.seconds ?? 0;
         return bv - av;
       });
-      setApplications(apps);
+      updateData('applications', apps);
     });
 
     return () => {
@@ -425,30 +402,30 @@ const StudentDashboard = () => {
   // Fetch all data on component mount
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
+      updateUi('loading', true);
       try {
         await Promise.all([
           fetchApplications(),
           fetchInstitutions(),
           fetchJobs(),
           fetchProfile(),
-          fetchTranscripts(),
-          fetchCertificates(),
+          fetchDocuments('transcript'),
+          fetchDocuments('certificate'),
           fetchAllCourses()
         ]);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
-        setLoading(false);
+        updateUi('loading', false);
       }
     };
     
     fetchData();
-  }, [fetchApplications, fetchInstitutions, fetchJobs, fetchProfile, fetchTranscripts, fetchCertificates]);
+  }, [fetchApplications, fetchInstitutions, fetchJobs, fetchProfile, fetchDocuments, fetchAllCourses]);
 
-  // Check if student can apply to a course
+  // Application logic
   const canApplyToCourse = (institutionId, courseId) => {
-    const existingApplication = applications.find(
+    const existingApplication = data.applications.find(
       app => app.instituteId === institutionId && app.courseId === courseId
     );
     
@@ -456,7 +433,7 @@ const StudentDashboard = () => {
       return { canApply: false, reason: 'You have already applied to this course.' };
     }
     
-    const institutionApplications = applications.filter(
+    const institutionApplications = data.applications.filter(
       app => app.instituteId === institutionId
     );
     
@@ -489,21 +466,22 @@ const StudentDashboard = () => {
       }
     }
     
-    setSelectedCourse({ institution, course });
-    setShowApplicationModal(true);
+    updateApplicationState('selectedCourse', { institution, course });
+    updateApplicationState('showApplicationModal', true);
   };
 
   const submitApplication = async () => {
-    if (!selectedCourse || !currentUser) return;
+    if (!application.selectedCourse || !currentUser) return;
     
-    setLoading(true);
+    updateUi('loading', true);
     try {
-      // Resolve institution and faculty names if not present
-      let institutionName = selectedCourse.institution?.name || '';
-      let facultyName =
-        selectedCourse.institution?.faculties?.find(f => f.id === selectedCourse.course.facultyId)?.name || '';
-      let instituteId = selectedCourse.institution?.id || selectedCourse.course?.institutionId;
-      const facultyId = selectedCourse.course?.facultyId;
+      const { institution, course } = application.selectedCourse;
+      
+      // Resolve institution and faculty names
+      let institutionName = institution?.name || '';
+      let facultyName = institution?.faculties?.find(f => f.id === course.facultyId)?.name || '';
+      let instituteId = institution?.id || course?.institutionId;
+      const facultyId = course?.facultyId;
 
       if (!institutionName && instituteId) {
         try {
@@ -513,40 +491,19 @@ const StudentDashboard = () => {
           }
         } catch {}
       }
-      if (!facultyName && instituteId && facultyId) {
-        try {
-          // Try top-level faculty
-          const facTopDoc = await getDoc(doc(db, 'faculties', facultyId));
-          if (facTopDoc.exists()) {
-            facultyName = facTopDoc.data().name || facultyName;
-          } else {
-            // Fallback nested
-            const facNestedDoc = await getDoc(doc(db, 'institutions', instituteId, 'faculties', facultyId));
-            if (facNestedDoc.exists()) {
-              facultyName = facNestedDoc.data().name || facultyName;
-            }
-          }
-        } catch {}
-      }
 
-      // Upload supporting documents to storage in parallel and collect URLs
+      // Upload supporting documents
       let uploadedDocuments = [];
-      if (Array.isArray(applicationForm.documents) && applicationForm.documents.length > 0) {
+      if (Array.isArray(application.form.documents) && application.form.documents.length > 0) {
         const MAX_FILES = 5;
-        const MAX_SIZE = 10 * 1024 * 1024; // 10MB
-        const files = applicationForm.documents
+        const MAX_SIZE = 10 * 1024 * 1024;
+        const files = application.form.documents
           .slice(0, MAX_FILES)
-          .filter((f) => {
-            if (f.size > MAX_SIZE) {
-              console.warn(`Skipping ${f.name}: exceeds 10MB`);
-              return false;
-            }
-            return true;
-          });
+          .filter((f) => f.size <= MAX_SIZE);
 
         const uploadTasks = files.map(async (file) => {
           try {
-            const storageRef = ref(storage, `applications/${currentUser.uid}/${selectedCourse.course.id}/${file.name}`);
+            const storageRef = ref(storage, `applications/${currentUser.uid}/${course.id}/${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             const url = await getDownloadURL(snapshot.ref);
             return {
@@ -569,16 +526,16 @@ const StudentDashboard = () => {
 
       const applicationData = {
         studentId: currentUser.uid,
-        studentName: `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || currentUser.email,
+        studentName: `${data.profile.firstName || ''} ${data.profile.lastName || ''}`.trim() || currentUser.email,
         studentEmail: currentUser.email,
         instituteId: instituteId,
         instituteName: institutionName || 'Unknown Institution',
         facultyId: facultyId,
         facultyName: facultyName || 'Unknown Faculty',
-        courseId: selectedCourse.course.id,
-        courseName: selectedCourse.course.name,
-        courseCode: selectedCourse.course.code,
-        personalStatement: applicationForm.personalStatement,
+        courseId: course.id,
+        courseName: course.name,
+        courseCode: course.code,
+        personalStatement: application.form.personalStatement,
         documents: uploadedDocuments,
         status: 'pending',
         appliedDate: serverTimestamp(),
@@ -589,7 +546,7 @@ const StudentDashboard = () => {
       
       // Create notification for admin
       const notificationData = {
-        recipientId: 'admin', // Or specific admin IDs
+        recipientId: 'admin',
         title: 'New Application Submitted',
         message: `${applicationData.studentName} applied for ${applicationData.courseName} at ${applicationData.instituteName}`,
         type: 'application',
@@ -600,25 +557,24 @@ const StudentDashboard = () => {
       
       await addDoc(collection(db, 'notifications'), notificationData);
       
-      setShowApplicationModal(false);
-      setSelectedCourse(null);
-      setApplicationForm({ personalStatement: '', documents: [] });
+      updateApplicationState('showApplicationModal', false);
+      updateApplicationState('selectedCourse', null);
+      updateApplicationState('form', { personalStatement: '', documents: [] });
       alert('Application submitted successfully!');
     } catch (error) {
       console.error('Error submitting application:', error);
       alert('Failed to submit application. Please try again.');
     } finally {
-      setLoading(false);
+      updateUi('loading', false);
     }
   };
 
   const startApplicationFromCourse = async (course) => {
     try {
-      // Find institution in current state
-      let institution = institutions.find(inst =>
+      let institution = data.institutions.find(inst =>
         inst.faculties?.some(f => f.id === course.facultyId && f.courses?.some(c => c.id === course.id))
       );
-      // If not found, build a minimal institution object with fetched name
+      
       if (!institution) {
         const instituteId = course.institutionId;
         let institutionName = '';
@@ -632,48 +588,47 @@ const StudentDashboard = () => {
         }
         institution = { id: instituteId, name: institutionName, faculties: [] };
       }
-      setSelectedCourse({ institution, course });
-      setShowApplicationModal(true);
+      
+      updateApplicationState('selectedCourse', { institution, course });
+      updateApplicationState('showApplicationModal', true);
     } catch (e) {
       alert('Unable to start application for this course. Please try from Browse Institutions.');
     }
   };
 
   const updateProfile = async (profileData) => {
-    if (!profile.id) return;
+    if (!data.profile.id) return;
     
-    setLoading(true);
+    updateUi('loading', true);
     try {
       const updatedProfile = {
         ...profileData,
         updatedAt: serverTimestamp()
       };
       
-      await updateDoc(doc(db, 'students', profile.id), updatedProfile);
-      setProfile(prev => ({ ...prev, ...updatedProfile }));
+      await updateDoc(doc(db, 'students', data.profile.id), updatedProfile);
+      updateData('profile', { ...data.profile, ...updatedProfile });
       alert('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
       alert('Failed to update profile. Please try again.');
     } finally {
-      setLoading(false);
+      updateUi('loading', false);
     }
   };
 
   const uploadDocument = async (file, type) => {
     if (!currentUser) return;
     
-    setLoading(true);
+    updateUi('loading', true);
     try {
-      // Upload file to Firebase Storage
       const storageRef = ref(storage, `documents/${currentUser.uid}/${type}/${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
-      // Save document metadata to Firestore
       const documentData = {
         studentId: currentUser.uid,
-        studentName: `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || currentUser.email,
+        studentName: `${data.profile.firstName || ''} ${data.profile.lastName || ''}`.trim() || currentUser.email,
         name: file.name,
         type: type,
         size: file.size,
@@ -685,11 +640,10 @@ const StudentDashboard = () => {
       const docRef = await addDoc(collection(db, 'documents'), documentData);
       const newDocument = { id: docRef.id, ...documentData };
       
-      // Update state based on document type
       if (type === 'transcript') {
-        setTranscripts(prev => [newDocument, ...prev]);
+        updateData('transcripts', [newDocument, ...data.transcripts]);
       } else if (type === 'certificate') {
-        setCertificates(prev => [newDocument, ...prev]);
+        updateData('certificates', [newDocument, ...data.certificates]);
       }
       
       alert(`${type.charAt(0).toUpperCase() + type.slice(1)} uploaded successfully!`);
@@ -697,7 +651,7 @@ const StudentDashboard = () => {
       console.error('Error uploading document:', error);
       alert('Failed to upload document. Please try again.');
     } finally {
-      setLoading(false);
+      updateUi('loading', false);
     }
   };
 
@@ -710,7 +664,7 @@ const StudentDashboard = () => {
     try {
       const jobApplicationData = {
         studentId: currentUser.uid,
-        studentName: `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || currentUser.email,
+        studentName: `${data.profile.firstName || ''} ${data.profile.lastName || ''}`.trim() || currentUser.email,
         studentEmail: currentUser.email,
         jobId: job.id,
         jobTitle: job.title,
@@ -718,12 +672,11 @@ const StudentDashboard = () => {
         companyName: job.companyName,
         status: 'pending',
         appliedDate: serverTimestamp(),
-        resume: profile.resumeUrl || '',
+        resume: data.profile.resumeUrl || '',
         coverLetter: ''
       };
       
       await addDoc(collection(db, 'jobApplications'), jobApplicationData);
-      
       alert('Job application submitted successfully!');
     } catch (error) {
       console.error('Error applying for job:', error);
@@ -750,8 +703,8 @@ const StudentDashboard = () => {
   };
 
   const getUserInitials = () => {
-    if (profile.firstName && profile.lastName) {
-      return `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase();
+    if (data.profile.firstName && data.profile.lastName) {
+      return `${data.profile.firstName.charAt(0)}${data.profile.lastName.charAt(0)}`.toUpperCase();
     }
     return currentUser?.email?.charAt(0).toUpperCase() || 'S';
   };
@@ -761,20 +714,27 @@ const StudentDashboard = () => {
     navigate('/login');
   };
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const toggleSidebar = () => {
+    updateUi('sidebarOpen', !ui.sidebarOpen);
+  };
+
+  const handleTabChange = (tabId) => {
+    updateUi('activeTab', tabId);
+    updateUi('sidebarOpen', false);
+  };
 
   return (
     <div className="dashboard-container">
       {/* Mobile Toggle */}
       <button 
         className="dashboard-mobile-toggle"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
+        onClick={toggleSidebar}
       >
         <i className="bi bi-list"></i>
       </button>
 
       {/* Sidebar */}
-      <aside className={`dashboard-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`dashboard-sidebar ${ui.sidebarOpen ? 'open' : ''}`}>
         <div className="dashboard-sidebar-header">
           <h2>
             <i className="bi bi-person-circle"></i>
@@ -785,17 +745,14 @@ const StudentDashboard = () => {
           {tabs.map(tab => (
             <li key={tab.id} className="dashboard-sidebar-nav-item w-100">
               <button
-                className={`dashboard-sidebar-nav-link w-100 text-center ${activeTab === tab.id ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    setSidebarOpen(false);
-                  }}
-                >
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              </li>
-            ))}
+                className={`dashboard-sidebar-nav-link w-100 text-center ${ui.activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => handleTabChange(tab.id)}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            </li>
+          ))}
         </ul>
         <div className="dashboard-sidebar-footer">
           <button 
@@ -818,11 +775,11 @@ const StudentDashboard = () => {
               Student Dashboard
             </h1>
             <p className="text-muted mb-0 mt-2">
-              Welcome back{profile.firstName ? `, ${profile.firstName}` : ''}! Track your applications and explore opportunities.
+              Welcome back{data.profile.firstName ? `, ${data.profile.firstName}` : ''}! Track your applications and explore opportunities.
             </p>
           </div>
           <div className="dashboard-header-right">
-            <NotificationBell notifications={notifications} />
+            <NotificationBell notifications={data.notifications} />
             <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow" 
                  style={{width: '45px', height: '45px'}}>
               {getUserInitials()}
@@ -832,135 +789,123 @@ const StudentDashboard = () => {
 
         {/* Tab Content */}
         <div className="dashboard-content">
-            {activeTab === 'dashboard' && (
-              <div className="tab-pane fade show active">
-                <DashboardOverview 
-                  applications={applications} 
-                  jobs={jobs} 
-                  profile={profile}
-                  transcripts={transcripts}
-                  certificates={certificates}
-                  getStatusBadge={getStatusBadge}
-                  setActiveTab={setActiveTab}
-                />
-              </div>
-            )}
+          {ui.activeTab === 'dashboard' && (
+            <DashboardOverview 
+              applications={data.applications} 
+              jobs={data.jobs} 
+              profile={data.profile}
+              transcripts={data.transcripts}
+              certificates={data.certificates}
+              getStatusBadge={getStatusBadge}
+              setActiveTab={(tab) => updateUi('activeTab', tab)}
+            />
+          )}
 
-            {activeTab === 'applications' && (
-              <div className="tab-pane fade show active">
-                <ApplicationsManagement 
-                  applications={applications}
-                  getStatusBadge={getStatusBadge}
-                  loading={loading}
-                />
-              </div>
-            )}
+          {ui.activeTab === 'applications' && (
+            <ApplicationsManagement 
+              applications={data.applications}
+              getStatusBadge={getStatusBadge}
+              loading={ui.loading}
+            />
+          )}
 
-            {activeTab === 'institutions' && (
-              <div className="tab-pane fade show active">
-                <InstitutionsManagement 
-                  institutions={institutions}
-                  applications={applications}
-                  handleApplication={handleApplication}
-                  canApplyToCourse={canApplyToCourse}
-                  loading={loading}
-                />
-              </div>
-            )}
+          {ui.activeTab === 'institutions' && (
+            <InstitutionsManagement 
+              institutions={data.institutions}
+              applications={data.applications}
+              handleApplication={handleApplication}
+              canApplyToCourse={canApplyToCourse}
+              loading={ui.loadingInstitutions}
+            />
+          )}
 
-            {activeTab === 'jobs' && (
-              <div className="tab-pane fade show active">
-                <JobsManagement 
-                  jobs={jobs}
-                  applyForJob={applyForJob}
-                  profile={profile}
-                  loading={loading}
-                />
-              </div>
-            )}
+          {ui.activeTab === 'jobs' && (
+            <JobsManagement 
+              jobs={data.jobs}
+              applyForJob={applyForJob}
+              profile={data.profile}
+              loading={ui.loadingJobs}
+            />
+          )}
 
-            {activeTab === 'courses' && (
-              <div className="tab-pane fade show active">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h4 className="mb-0">All Courses</h4>
-                  <button className="btn btn-outline-secondary btn-sm" onClick={fetchAllCourses} disabled={loadingAllCourses}>
-                    <i className="bi bi-arrow-clockwise me-1"></i>
-                    Refresh
-                  </button>
+          {ui.activeTab === 'courses' && (
+            <div className="tab-pane fade show active">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h4 className="mb-0">All Courses</h4>
+                <button className="btn btn-outline-secondary btn-sm" onClick={fetchAllCourses} disabled={ui.loadingAllCourses}>
+                  <i className="bi bi-arrow-clockwise me-1"></i>
+                  Refresh
+                </button>
+              </div>
+              {ui.loadingAllCourses ? (
+                <div className="text-center py-4">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
                 </div>
-                {loadingAllCourses ? (
-                  <div className="text-center py-4">
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                  </div>
-                ) : allCourses.length === 0 ? (
-                  <div className="text-center py-4">
-                    <i className="bi bi-book text-muted fs-1 mb-3"></i>
-                    <p className="text-muted">No courses found</p>
-                  </div>
-                ) : (
-                  <div className="row g-3">
-                    {allCourses.map((course) => (
-                      <div key={course.id} className="col-md-6 col-lg-4">
-                        <div className="card h-100">
-                          <div className="card-header bg-light">
-                            <h6 className="mb-0">{course.name || 'Untitled Course'}</h6>
-                            {course.code && <small className="text-muted">Code: {course.code}</small>}
+              ) : data.allCourses.length === 0 ? (
+                <div className="text-center py-4">
+                  <i className="bi bi-book text-muted fs-1 mb-3"></i>
+                  <p className="text-muted">No courses found</p>
+                </div>
+              ) : (
+                <div className="row g-3">
+                  {data.allCourses.map((course) => (
+                    <div key={course.id} className="col-md-6 col-lg-4">
+                      <div className="card h-100">
+                        <div className="card-header bg-light">
+                          <h6 className="mb-0">{course.name || 'Untitled Course'}</h6>
+                          {course.code && <small className="text-muted">Code: {course.code}</small>}
+                        </div>
+                        <div className="card-body">
+                          {course.description && <p className="small text-muted mb-3">{course.description}</p>}
+                          <div className="small text-muted mb-2">
+                            {course.level && <span className="me-3"><i className="bi bi-mortarboard me-1"></i>{course.level}</span>}
+                            {course.department && <span className="me-3"><i className="bi bi-building me-1"></i>{course.department}</span>}
+                            {course.seats && <span><i className="bi bi-people me-1"></i>{course.seats} seats</span>}
                           </div>
-                          <div className="card-body">
-                            {course.description && <p className="small text-muted mb-3">{course.description}</p>}
-                            <div className="small text-muted mb-2">
-                              {course.level && <span className="me-3"><i className="bi bi-mortarboard me-1"></i>{course.level}</span>}
-                              {course.department && <span className="me-3"><i className="bi bi-building me-1"></i>{course.department}</span>}
-                              {course.seats && <span><i className="bi bi-people me-1"></i>{course.seats} seats</span>}
-                            </div>
-                            <div className="d-flex gap-2">
-                              <button className="btn btn-primary flex-grow-1" onClick={() => startApplicationFromCourse(course)}>
-                                Apply
-                              </button>
-                            </div>
+                          <div className="d-flex gap-2">
+                            <button className="btn btn-primary flex-grow-1" onClick={() => startApplicationFromCourse(course)}>
+                              Apply
+                            </button>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-            {activeTab === 'profile' && (
-              <div className="tab-pane fade show active">
-                <ProfileManagement 
-                  profile={profile}
-                  updateProfile={updateProfile}
-                  loading={loading}
-                />
-              </div>
-            )}
+          {ui.activeTab === 'profile' && (
+            <ProfileManagement 
+              profile={data.profile}
+              updateProfile={updateProfile}
+              loading={ui.loading}
+            />
+          )}
 
-            {activeTab === 'documents' && (
-              <div className="tab-pane fade show active">
-                <DocumentsManagement 
-                  transcripts={transcripts}
-                  certificates={certificates}
-                  uploadDocument={uploadDocument}
-                  loading={loading}
-                />
-              </div>
-            )}
+          {ui.activeTab === 'documents' && (
+            <DocumentsManagement 
+              transcripts={data.transcripts}
+              certificates={data.certificates}
+              uploadDocument={uploadDocument}
+              loading={ui.loading}
+            />
+          )}
         </div>
       </main>
 
       {/* Application Modal */}
       <ApplicationModal
-        showApplicationModal={showApplicationModal}
-        setShowApplicationModal={setShowApplicationModal}
-        selectedCourse={selectedCourse}
-        applicationForm={applicationForm}
-        setApplicationForm={setApplicationForm}
+        showApplicationModal={application.showApplicationModal}
+        setShowApplicationModal={(show) => updateApplicationState('showApplicationModal', show)}
+        selectedCourse={application.selectedCourse}
+        applicationForm={application.form}
+        setApplicationForm={(form) => updateApplicationState('form', form)}
         submitApplication={submitApplication}
-        loading={loading}
+        loading={ui.loading}
       />
     </div>
   );
