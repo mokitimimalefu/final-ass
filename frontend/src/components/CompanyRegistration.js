@@ -133,8 +133,10 @@ const CompanyRegistration = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
+                minLength="6"
                 className="form-control-beautiful"
               />
+              <Form.Text className="text-muted">Password must be at least 6 characters long.</Form.Text>
             </Form.Group>
           </Col>
 

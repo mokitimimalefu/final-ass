@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// Use environment variable for backend URL, fallback to Render URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://final-group-2.onrender.com';
+// Use environment variable for backend URL, fallback to local development
+// Backend default port is 5000 (see backend/server.js). Keep env override via REACT_APP_API_URL.
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

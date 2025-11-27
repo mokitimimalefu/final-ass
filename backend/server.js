@@ -6,37 +6,71 @@ require('dotenv').config();
 const app = express();
 
 // Initialize Firebase Admin using environment variables or service account file
+const fs = require('fs');
+const path = require('path');
 let serviceAccount;
 
-// Try to load from service account file first (more reliable)
-try {
-  const path = require('path');
-  const serviceAccountPath = path.join(__dirname, 'config', 'firebase-service-account.json');
-  serviceAccount = require(serviceAccountPath);
-  console.log('📁 Loaded Firebase service account from file');
-} catch (fileError) {
-  // Fallback to environment variables
-  console.log('📝 Using environment variables for Firebase credentials');
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY || "";
-  
-  if (!privateKey || privateKey.trim() === "") {
-    console.error('❌ FIREBASE_PRIVATE_KEY is missing or empty!');
-    console.error('Please set FIREBASE_PRIVATE_KEY in your .env file or provide firebase-service-account.json');
-    process.exit(1);
-  }
+// Path to potential service account file
+const serviceAccountPath = path.join(__dirname, 'config', 'firebase-service-account.json');
+const fileExists = fs.existsSync(serviceAccountPath);
 
-  serviceAccount = {
-    type: "service_account",
-    project_id: process.env.FIREBASE_PROJECT_ID || "group2-e1233",
-    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID || "94bc2e9559b5dcbe7915e07be7908faf066c54d5",
-    private_key: privateKey.replace(/\\n/g, '\n'),
-    client_email: process.env.FIREBASE_CLIENT_EMAIL || "firebase-adminsdk-fbsvc@group2-e1233.iam.gserviceaccount.com",
-    client_id: process.env.FIREBASE_CLIENT_ID || "102371669753608039904",
-    auth_uri: "https://accounts.google.com/o/oauth2/auth",
-    token_uri: "https://oauth2.googleapis.com/token",
-    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-    client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL || "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40group2-e1233.iam.gserviceaccount.com"
+if (fileExists) {
+  try {
+    serviceAccount = require(serviceAccountPath);
+    console.log('📁 Loaded Firebase service account from file');
+  } catch (fileError) {
+    console.warn('⚠️ Failed to load service account file, will attempt env vars as fallback');
+    console.warn(fileError && fileError.message ? fileError.message : fileError);
+  }
+}
+
+// Normalize FIREBASE_PRIVATE_KEY from env (if present)
+const rawEnvPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
+let envServiceAccount = null;
+if (rawEnvPrivateKey && typeof rawEnvPrivateKey === 'string' && rawEnvPrivateKey.trim() !== '') {
+  // Remove wrapping quotes if present (some .env tools keep them)
+  let keyCandidate = rawEnvPrivateKey.trim();
+  if ((keyCandidate.startsWith('"') && keyCandidate.endsWith('"')) || (keyCandidate.startsWith("'") && keyCandidate.endsWith("'"))) {
+    keyCandidate = keyCandidate.slice(1, -1);
+  }
+  // Convert literal \n into real newlines
+  keyCandidate = keyCandidate.replace(/\\n/g, '\n');
+
+  envServiceAccount = {
+    type: 'service_account',
+    project_id: process.env.FIREBASE_PROJECT_ID || 'group2-e1233',
+    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID || undefined,
+    private_key: keyCandidate,
+    client_email: process.env.FIREBASE_CLIENT_EMAIL || undefined,
+    client_id: process.env.FIREBASE_CLIENT_ID || undefined,
+    auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+    token_uri: 'https://oauth2.googleapis.com/token',
+    auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+    client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL || undefined
   };
+}
+
+// If file present prefer file-based credentials, otherwise use env-based credentials
+if (!serviceAccount && envServiceAccount) {
+  serviceAccount = envServiceAccount;
+  console.log('📝 Using Firebase credentials from environment variables');
+}
+
+// If we have both sources, compare and warn if IDs differ to help debugging
+if (serviceAccount && envServiceAccount && serviceAccount.private_key_id && envServiceAccount.private_key_id) {
+  if (serviceAccount.private_key_id !== envServiceAccount.private_key_id) {
+    console.warn('🔁 Mismatched Firebase key IDs detected:');
+    console.warn(` - file key id: ${serviceAccount.private_key_id}`);
+    console.warn(` - env  key id: ${envServiceAccount.private_key_id}`);
+    console.warn('This can cause Invalid JWT Signature errors if the used key was revoked. Consider aligning keys or removing the unused credential source.');
+  }
+}
+
+// Validate we actually have a private key
+if (!serviceAccount || !serviceAccount.private_key || serviceAccount.private_key.trim() === '') {
+  console.error('❌ Firebase private key is missing or empty!');
+  console.error('Provide a valid `backend/config/firebase-service-account.json` or set `FIREBASE_PRIVATE_KEY` in your environment.');
+  process.exit(1);
 }
 
 // Validate service account
@@ -116,7 +150,7 @@ app.use(cors({
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
-    process.env.FRONTEND_URL || 'https://final-group-11.onrender.com'
+    process.env.FRONTEND_URL || 'http://localhost:3000'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -124,7 +158,7 @@ app.use(cors({
 }));
 const allowedOrigins = [
   'http://localhost:3000', 
-  'https://final-group-11.onrender.com'
+  'http://localhost:3000'
 ];
 
 // Middleware
