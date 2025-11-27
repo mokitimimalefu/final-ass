@@ -26,7 +26,7 @@ const CompanyRegistration = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match');
       return;
@@ -35,9 +35,13 @@ const CompanyRegistration = () => {
     setLoading(true);
 
     try {
-      const companyData = {
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+
+      // Store user data in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
         email: formData.email,
-        password: formData.password,
         userType: 'company',
         profileData: {
           name: formData.name,
@@ -48,15 +52,32 @@ const CompanyRegistration = () => {
             address: formData.address
           },
           description: formData.description
-        }
-      };
+        },
+        createdAt: new Date(),
+        isActive: true
+      });
 
-      const response = await authAPI.register(companyData);
+      // Store company-specific data
+      await setDoc(doc(db, 'companies', user.uid), {
+        name: formData.name,
+        industry: formData.industry,
+        website: formData.website,
+        contact: {
+          phone: formData.phone,
+          address: formData.address
+        },
+        description: formData.description,
+        status: 'pending',
+        createdAt: new Date(),
+        isEmailVerified: false
+      });
+
       alert('Registration successful! Please check your email to verify your account. After verification, your account will be reviewed by an admin for approval.');
-      
+
       window.location.href = '/login';
     } catch (error) {
-      alert(error.response?.data?.error || 'Registration failed');
+      console.error('Registration error:', error);
+      alert(error.message || 'Registration failed');
     } finally {
       setLoading(false);
     }

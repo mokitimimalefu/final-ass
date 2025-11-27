@@ -116,7 +116,8 @@ app.use(cors({
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
-    'https://final-group-11.onrender.com'  // Frontend URL
+    'https://final-group-9.onrender.com',  // Frontend URL
+    'https://final-group-11.onrender.com'  // Alternative frontend URL
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

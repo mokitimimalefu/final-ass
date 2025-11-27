@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { instituteAPI } from '../../services/api';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const ProfileManagement = ({ instituteId, instituteData, onUpdate }) => {
   const [loading, setLoading] = useState(false);
@@ -40,7 +41,11 @@ const ProfileManagement = ({ instituteId, instituteData, onUpdate }) => {
     setLoading(true);
 
     try {
-      await instituteAPI.updateProfile(instituteId, formData);
+      const instituteRef = doc(db, 'institutions', instituteId);
+      await updateDoc(instituteRef, {
+        ...formData,
+        updatedAt: new Date()
+      });
       alert('Profile updated successfully');
       onUpdate();
     } catch (error) {

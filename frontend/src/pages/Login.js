@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { authAPI } from '../services/api'; // ✅ Import from api.js
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -15,17 +22,25 @@ const Login = () => {
     setError('');
 
     try {
-      // ✅ Call your backend API
-      const response = await authAPI.login(email, password);
-      const { token, userType, userId } = response.data;
+      // Sign in with Firebase Auth
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      // Store token in localStorage
-      localStorage.setItem('token', token);
+      // Get user data from Firestore
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!userDoc.exists()) {
+        throw new Error('User data not found');
+      }
+
+      const userData = userDoc.data();
+      const userType = userData.userType;
+
+      // Store user info in localStorage
       localStorage.setItem('userType', userType);
-      localStorage.setItem('userId', userId);
+      localStorage.setItem('userId', user.uid);
 
       // Update auth context
-      login({ uid: userId, email, userType });
+      login({ uid: user.uid, email, userType });
 
       // Redirect based on user type
       switch (userType) {
@@ -46,7 +61,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Login failed';
+      const errorMessage = error.message || 'Login failed';
       setError(errorMessage);
       alert('Login failed: ' + errorMessage);
     } finally {
