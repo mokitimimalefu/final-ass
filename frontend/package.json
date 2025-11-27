@@ -16,7 +16,7 @@
     "web-vitals": "^5.1.0"
   },
   "scripts": {
-    "start": "npm start",
+    "start": "react-scripts start",
     "build": "react-scripts build",
     "postbuild": "node -e \"const fs = require('fs'); fs.copyFileSync('public/_redirects', 'build/_redirects');\"",
     "test": "react-scripts test",
