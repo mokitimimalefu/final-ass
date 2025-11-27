@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -11,6 +11,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { login } = useAuth();
+  const navigate = useNavigate(); // Add this line
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,32 +35,44 @@ const Login = () => {
       // Store user info in localStorage
       localStorage.setItem('userType', userType);
       localStorage.setItem('userId', user.uid);
+      localStorage.setItem('email', email);
 
       // Update auth context
-      login({ uid: user.uid, email, userType });
+      login({ 
+        uid: user.uid, 
+        email: email, 
+        userType: userType 
+      });
 
-      // Redirect based on user type
-      switch (userType) {
-        case 'admin':
-          navigate('/admin');
-          break;
-        case 'institute':
-          navigate('/institute');
-          break;
-        case 'student':
-          navigate('/student');
-          break;
-        case 'company':
-          navigate('/company');
-          break;
-        default:
-          navigate('/');
-      }
+      // Redirect based on user type using navigate
+      const dashboardPaths = {
+        'admin': '/admin',
+        'institute': '/institute',
+        'student': '/student',
+        'company': '/company'
+      };
+
+      const redirectPath = dashboardPaths[userType] || '/';
+      navigate(redirectPath, { replace: true });
+
     } catch (error) {
       console.error('Login error:', error);
-      const errorMessage = error.message || 'Login failed';
+      
+      // More specific error messages
+      let errorMessage = 'Login failed. Please check your credentials.';
+      if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.';
+      } else if (error.message === 'User data not found') {
+        errorMessage = 'User account not properly set up. Please contact support.';
+      }
+      
       setError(errorMessage);
-      alert('Login failed: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -96,6 +109,7 @@ const Login = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
                   />
                 </div>
 
@@ -112,6 +126,7 @@ const Login = () => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
                   />
                 </div>
 
