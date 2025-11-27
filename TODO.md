@@ -1,6 +1,9 @@
-# TODO: Change Course Information Text Colors in ApplicationsManagement
-
-- [x] Add 'text-dark' class to the <h6>Course Information</h6> element to make the heading black
-- [x] Add 'text-white' class to the <strong>Course:</strong> label in the modal
-- [x] Add 'text-white' class to the <strong>Institution:</strong> label in the modal
-- [x] Add 'text-white' class to the <strong>Faculty:</strong> label in the modal
+- [x] Remove Google-related imports (GoogleAuthProvider, signInWithPopup)
+- [x] Remove state variables: googleUser, notificationSent, approvalReceived
+- [x] Remove functions: validateGoogleEmail, handleGoogleSignIn, sendApprovalNotification, handleApproval
+- [x] Remove useEffect for notification listening
+- [x] Modify handleSubmit: remove checks for googleUser and approvalReceived, allow direct email input
+- [x] Update UI: Make email field a standard editable input, remove Google sign-in button, approval notifications, and related alerts
+- [x] Remove notificationService import if no longer needed
+- [x] Add email verification during registration
+- [x] Update login to check for email verification before allowing access

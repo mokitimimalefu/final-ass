@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Form, Row, Col, Button, Spinner } from 'react-bootstrap';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
@@ -19,6 +19,7 @@ const StudentRegistration = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -27,11 +28,13 @@ const StudentRegistration = () => {
     });
   };
 
+
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
 
@@ -41,6 +44,16 @@ const StudentRegistration = () => {
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
+
+      // Send email verification
+      try {
+        await sendEmailVerification(user);
+        console.log('Email verification sent successfully');
+      } catch (emailError) {
+        console.error('Error sending email verification:', emailError);
+        // Continue with registration even if email fails, but log the error
+        alert('Registration successful, but there was an issue sending the verification email. Please contact support.');
+      }
 
       // Store user data in Firestore
       await setDoc(doc(db, 'users', user.uid), {
@@ -56,7 +69,8 @@ const StudentRegistration = () => {
           graduationYear: formData.graduationYear
         },
         createdAt: new Date(),
-        isActive: true
+        isActive: false, // User is not active until email is verified
+        emailVerified: false
       });
 
       // Store student-specific data
@@ -76,13 +90,13 @@ const StudentRegistration = () => {
         isEmailVerified: false
       });
 
-      alert('Registration successful! You can now login.');
+      alert('Registration successful! Please check your email and click the verification link to complete your registration. You can then login.');
 
       // Redirect to login
       window.location.href = '/login';
     } catch (error) {
       console.error('Registration error:', error);
-      alert(error.message || 'Registration failed');
+      setError(error.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -237,6 +251,14 @@ const StudentRegistration = () => {
               />
             </Form.Group>
           </Col>
+
+          {error && (
+            <Col md={12}>
+              <div className="alert alert-danger mt-3">
+                {error}
+              </div>
+            </Col>
+          )}
 
           <Col md={12}>
             <Button

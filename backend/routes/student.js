@@ -1,5 +1,6 @@
 module.exports = (db, auth) => {
   const express = require('express');
+  const admin = require('firebase-admin');
   const router = express.Router();
 
   // Get student applications
@@ -604,6 +605,39 @@ module.exports = (db, auth) => {
       res.json({ message: 'Notification marked as read' });
     } catch (error) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Send approval notification
+  router.post('/send-approval-notification', async (req, res) => {
+    try {
+      const { fcmToken } = req.body;
+
+      if (!fcmToken) {
+        return res.status(400).json({ error: 'FCM token is required' });
+      }
+
+      const message = {
+        token: fcmToken,
+        data: {
+          type: 'approval'
+        },
+        notification: {
+          title: 'Registration Approval Required',
+          body: 'Please approve your registration on your phone.'
+        }
+      };
+
+      const response = await admin.messaging().send(message);
+
+      res.json({
+        success: true,
+        messageId: response,
+        message: 'Approval notification sent successfully'
+      });
+    } catch (error) {
+      console.error('Error sending approval notification:', error);
+      res.status(500).json({ error: 'Failed to send notification: ' + error.message });
     }
   });
 
