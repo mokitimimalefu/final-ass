@@ -1,6 +1,7 @@
 {
   "name": "career-guidance-frontend",
   "version": "1.0.0",
+  "homepage": "https://final-group-11.onrender.com",
   "dependencies": {
     "axios": "^1.4.0",
     "bootstrap": "^5.3.8",
