@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use environment variable for backend URL, fallback to deployed URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://final-group-5-jib5.onrender.com';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://final-ass.onrender.com';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

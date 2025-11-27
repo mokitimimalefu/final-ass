@@ -5,7 +5,7 @@
 
 const http = require('http');
 
-const API_BASE = 'localhost';
+const API_BASE = 'https://final-ass.onrender.com';
 const API_PORT = 5000;
 
 // Test colors for output
