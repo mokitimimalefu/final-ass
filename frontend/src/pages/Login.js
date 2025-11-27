@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -40,19 +41,19 @@ const Login = () => {
       // Redirect based on user type
       switch (userType) {
         case 'admin':
-          window.location.href = '/admin';
+          navigate('/admin');
           break;
         case 'institute':
-          window.location.href = '/institute';
+          navigate('/institute');
           break;
         case 'student':
-          window.location.href = '/student';
+          navigate('/student');
           break;
         case 'company':
-          window.location.href = '/company';
+          navigate('/company');
           break;
         default:
-          window.location.href = '/';
+          navigate('/');
       }
     } catch (error) {
       console.error('Login error:', error);

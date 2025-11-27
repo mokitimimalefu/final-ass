@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Form, Row, Col, Button, Spinner } from 'react-bootstrap';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -93,7 +94,7 @@ const StudentRegistration = () => {
       alert('Registration successful! Please check your email and click the verification link to complete your registration. You can then login.');
 
       // Redirect to login
-      window.location.href = '/login';
+      navigate('/login');
     } catch (error) {
       console.error('Registration error:', error);
       setError(error.message || 'Registration failed');
