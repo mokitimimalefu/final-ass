@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Form, Row, Col, Button, Spinner } from 'react-bootstrap';
-import { authAPI } from '../services/api';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const InstituteRegistration = () => {
   const [formData, setFormData] = useState({
@@ -26,7 +28,7 @@ const InstituteRegistration = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match');
       return;
@@ -35,9 +37,13 @@ const InstituteRegistration = () => {
     setLoading(true);
 
     try {
-      const instituteData = {
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+
+      // Store user data in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
         email: formData.email,
-        password: formData.password,
         userType: 'institute',
         profileData: {
           name: formData.name,
@@ -47,14 +53,30 @@ const InstituteRegistration = () => {
             phone: formData.phone,
             address: formData.address
           }
-        }
-      };
+        },
+        createdAt: new Date(),
+        isActive: true
+      });
 
-      const response = await authAPI.register(instituteData);
-      alert(response.data.message || 'Registration successful! Please check your email for verification.');
+      // Store institute-specific data
+      await setDoc(doc(db, 'institutions', user.uid), {
+        name: formData.name,
+        location: formData.location,
+        contact: {
+          email: formData.contactEmail,
+          phone: formData.phone,
+          address: formData.address
+        },
+        isActive: true,
+        createdAt: new Date(),
+        isEmailVerified: false
+      });
+
+      alert('Registration successful! Please check your email for verification.');
       setVerificationSent(true);
     } catch (error) {
-      alert(error.response?.data?.error || 'Registration failed');
+      console.error('Registration error:', error);
+      alert(error.message || 'Registration failed');
     } finally {
       setLoading(false);
     }

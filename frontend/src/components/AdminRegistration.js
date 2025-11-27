@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Form, Row, Col, Button, Spinner } from 'react-bootstrap';
-import { authAPI } from '../services/api';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const AdminRegistration = () => {
   const [formData, setFormData] = useState({
@@ -23,7 +25,7 @@ const AdminRegistration = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match');
       return;
@@ -32,24 +34,41 @@ const AdminRegistration = () => {
     setLoading(true);
 
     try {
-      const adminData = {
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+
+      // Store user data in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
         email: formData.email,
-        password: formData.password,
         userType: 'admin',
         profileData: {
           firstName: formData.firstName,
           lastName: formData.lastName,
           phone: formData.phone
-        }
-      };
+        },
+        createdAt: new Date(),
+        isActive: true
+      });
 
-      const response = await authAPI.register(adminData);
-      alert(response.data.message || 'Registration successful! Please check your email for verification.');
-      
+      // Store admin-specific data
+      await setDoc(doc(db, 'admins', user.uid), {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        email: formData.email,
+        isActive: true,
+        createdAt: new Date(),
+        isEmailVerified: false
+      });
+
+      alert('Registration successful! Please check your email for verification.');
+
       // Redirect to login
       window.location.href = '/login';
     } catch (error) {
-      alert(error.response?.data?.error || 'Registration failed');
+      console.error('Registration error:', error);
+      alert(error.message || 'Registration failed');
     } finally {
       setLoading(false);
     }

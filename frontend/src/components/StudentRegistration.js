@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Form, Row, Col, Button, Spinner } from 'react-bootstrap';
-import { authAPI } from '../services/api';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const StudentRegistration = () => {
   const [formData, setFormData] = useState({
@@ -27,7 +29,7 @@ const StudentRegistration = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match');
       return;
@@ -36,9 +38,13 @@ const StudentRegistration = () => {
     setLoading(true);
 
     try {
-      const studentData = {
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+
+      // Store user data in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
         email: formData.email,
-        password: formData.password,
         userType: 'student',
         profileData: {
           firstName: formData.firstName,
@@ -48,16 +54,35 @@ const StudentRegistration = () => {
           address: formData.address,
           highSchool: formData.highSchool,
           graduationYear: formData.graduationYear
-        }
-      };
+        },
+        createdAt: new Date(),
+        isActive: true
+      });
 
-      const response = await authAPI.register(studentData);
+      // Store student-specific data
+      await setDoc(doc(db, 'students', user.uid), {
+        personalInfo: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          dateOfBirth: formData.dateOfBirth,
+          address: formData.address,
+          highSchool: formData.highSchool,
+          graduationYear: formData.graduationYear
+        },
+        qualifications: {},
+        createdAt: new Date(),
+        isProfileComplete: false,
+        isEmailVerified: false
+      });
+
       alert('Registration successful! You can now login.');
-      
+
       // Redirect to login
       window.location.href = '/login';
     } catch (error) {
-      alert(error.response?.data?.error || 'Registration failed');
+      console.error('Registration error:', error);
+      alert(error.message || 'Registration failed');
     } finally {
       setLoading(false);
     }

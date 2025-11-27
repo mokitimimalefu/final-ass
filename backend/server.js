@@ -95,14 +95,14 @@ try {
 
   db = admin.firestore();
   auth = admin.auth();
-  
+
   console.log('✅ Firebase Admin initialized successfully');
   console.log('💡 Note: Network errors may occur if there\'s no internet connection');
   console.log('   The server will continue running, but Firebase features require internet access');
-  
+
 } catch (error) {
   console.error('❌ Firebase Admin initialization failed:', error.message);
-  
+
   if (error.message.includes('ENOTFOUND') || error.message.includes('getaddrinfo')) {
     console.error('\n🌐 Network Error: Cannot reach Google servers');
     console.error('   This could be due to:');
@@ -124,7 +124,7 @@ try {
   } else {
     console.error('   Server will continue, but Firebase may not work properly');
   }
-  
+
   // Try to initialize anyway - the error might be transient
   try {
     if (admin.apps.length === 0) {
@@ -146,20 +146,18 @@ try {
 // CORS Configuration
 app.use(cors({
   origin: [
-    'http://localhost:3000', 
+    'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
-    process.env.FRONTEND_URL || 'http://localhost:3000'
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'https://final-group-9.onrender.com',  // Frontend URL
+    'https://final-group-11.onrender.com'  // Alternative frontend URL
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
-const allowedOrigins = [
-  'http://localhost:3000', 
-  'http://localhost:3000'
-];
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
@@ -171,22 +169,42 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes (require after initialization)
-const authRoutes = require('./routes/auth')(db, auth);
-const adminRoutes = require('./routes/admin')(db, auth);
-const instituteRoutes = require('./routes/institute')(db, auth);
-const studentRoutes = require('./routes/student')(db, auth);
-const companyRoutes = require('./routes/company')(db, auth);
+// Routes (require after initialization) - only if Firebase is properly initialized
+if (db && auth) {
+  const authRoutes = require('./routes/auth')(db, auth);
+  const adminRoutes = require('./routes/admin')(db, auth);
+  const instituteRoutes = require('./routes/institute')(db, auth);
+  const studentRoutes = require('./routes/student')(db, auth);
+  const companyRoutes = require('./routes/company')(db, auth);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/institute', instituteRoutes);
-app.use('/api/student', studentRoutes);
-app.use('/api/company', companyRoutes);
+  app.use('/api/auth', authRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/institute', instituteRoutes);
+  app.use('/api/student', studentRoutes);
+  app.use('/api/company', companyRoutes);
+} else {
+  console.error('❌ Firebase not initialized - auth routes will not be available');
+  // Add fallback route for auth endpoints
+  app.use('/api/auth', (req, res) => {
+    res.status(503).json({ error: 'Authentication service unavailable - Firebase not initialized' });
+  });
+  app.use('/api/admin', (req, res) => {
+    res.status(503).json({ error: 'Admin service unavailable - Firebase not initialized' });
+  });
+  app.use('/api/institute', (req, res) => {
+    res.status(503).json({ error: 'Institute service unavailable - Firebase not initialized' });
+  });
+  app.use('/api/student', (req, res) => {
+    res.status(503).json({ error: 'Student service unavailable - Firebase not initialized' });
+  });
+  app.use('/api/company', (req, res) => {
+    res.status(503).json({ error: 'Company service unavailable - Firebase not initialized' });
+  });
+}
 
 // Health check route
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
+  res.status(200).json({
     message: 'Career Guidance Platform API is running!',
     timestamp: new Date().toISOString(),
     environment: 'development'
@@ -198,7 +216,6 @@ app.get("/", (req, res) => {
   res.status(200).send("Career Guidance Backend is running 🚀");
 });
 
-
 // 404 handler (must be before error handler)
 app.use('*', (req, res) => {
   console.log(`404 - Route not found: ${req.method} ${req.path}`);
@@ -208,9 +225,9 @@ app.use('*', (req, res) => {
 // Error handling middleware (must be last, with 4 parameters)
 app.use((error, req, res, next) => {
   console.error('Error:', error);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
-    message: error.message 
+    message: error.message
   });
 });
 
@@ -224,4 +241,4 @@ const server = app.listen(PORT)
   })
   .on('listening', () => {
     console.log(`Server is running on port ${server.address().port}`);
-});
+  });

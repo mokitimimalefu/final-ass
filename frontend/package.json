@@ -1,6 +1,7 @@
 {
   "name": "career-guidance-frontend",
   "version": "1.0.0",
+  "homepage": ".",
   "dependencies": {
     "axios": "^1.4.0",
     "bootstrap": "^5.3.8",
@@ -17,6 +18,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "postbuild": "node -e \"const fs = require('fs'); fs.copyFileSync('public/_redirects', 'build/_redirects');\"",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
