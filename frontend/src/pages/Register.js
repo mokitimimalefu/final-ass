@@ -4,6 +4,8 @@ import InstituteRegistration from '../components/InstituteRegistration';
 import CompanyRegistration from '../components/CompanyRegistration';
 import AdminRegistration from '../components/AdminRegistration';
 
+import { Link } from "react-router-dom";
+
 const Register = () => {
   const [userType, setUserType] = useState('student');
 
@@ -87,9 +89,9 @@ const Register = () => {
             <div className="text-center mt-4">
               <p className="text-white-50">
                 Already have an account?{' '}
-                <a href="/login" className="text-white text-decoration-none fw-medium">
+                <Link to="/login" className="text-white text-decoration-none fw-medium">
                   Sign in
-                </a>
+                </Link>
               </p>
             </div>
           </div>
